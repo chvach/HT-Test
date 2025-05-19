@@ -1,0 +1,19 @@
+---
+- name: Get version information from Cisco switch
+  hosts: CAT_9500
+  gather_facts: 'no'
+  connection: network_cli
+    #  vars_files:
+    #- asu-vault.yml
+  vars:
+    #ansible_user: "{{ username }}"
+      #ansible_password: "{{ password }}"
+    ansible_network_os: cisco.ios.ios
+      #ansible_network_cli_ssh_type: paramiko
+
+  tasks:
+    - name: Gather IOS facts from Cisco switch
+      cisco.ios.ios_facts: null
+    - name: Display version information
+      debug:
+        msg: 'Cisco Switch Version: {{ ansible_net_version }}'
