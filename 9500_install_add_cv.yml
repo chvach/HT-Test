@@ -1,0 +1,34 @@
+---
+- name: Catalyst 9500 Install Add
+  hosts: CAT_9500
+  gather_facts: no
+  vars:
+    ansible_network_os: ios
+    ansible_connection: network_cli
+    target_version: "17.12.05"  # Desired IOS XE version
+    ios_image: "cat9k_iosxe.17.12.05.SPA.bin"  # New IOS XE image file
+    ansible_command_timeout: 1200  # Increase timeout for long-running commands
+
+  tasks:
+    - name: Perform IOS upgrade in install mode
+      cisco.ios.ios_command:
+        commands:
+          - command: "install add file flash:/{{ ios_image }} activate commit"
+            prompt: "[This operation may require a reload of the system. Do you want to proceed? [y/n]]"
+            answer: "y"
+      register: install_result
+      vars:
+        ansible_command_timeout:  1200  #In Seconds
+
+    - name: Wait for device to come back online
+      wait_for_connection:
+        delay: 180
+        sleep: 60
+        timeout: 900
+
+    - name: Gather IOS facts from Cisco switch
+      cisco.ios.ios_facts: null
+    - name: Display version information
+      debug:
+        msg: 'Cisco Switch Version: {{ ansible_net_version }}'        
+
