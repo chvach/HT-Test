@@ -1,0 +1,66 @@
+---
+- name: Upgrade Cisco Catalyst 9500 IOS XE
+  hosts: CAT_9500
+  gather_facts: no
+  vars:
+    ansible_network_os: ios
+    ansible_connection: network_cli
+    target_version: "17.12.05"  # Desired IOS XE version
+    ios_image: "cat9k_iosxe.17.12.05.SPA.bin"  # New IOS XE image file
+    ftp_server: "172.29.242.36/ansibleenv/Images"  # FTP server IP
+    ftp_user: "htadmin"
+    ftp_pass: "asu.4TW!asu.4TW!"
+    expected_md5: "e032ebc5e8a9e050635a9b9d97dba49c"       #Expected MD5 Hash"
+    ios_image_file: "flash:/cat9k_iosxe.17.12.05.SPA.bin"   #IOS Image File
+    ansible_command_timeout: 1200  # Increase timeout for long-running commands
+
+  tasks:
+    - name: Gather current IOS facts
+      cisco.ios.ios_facts:
+      register: ios_facts
+
+    - name: Display current IOS version
+      debug:
+        msg: "Current IOS version: {{ ios_facts.ansible_facts.ansible_net_version }}"
+
+    - name: Check if upgrade is needed
+      set_fact:
+        upgrade_needed: "{{ ios_facts.ansible_facts.ansible_net_version != target_version }}"
+
+    - name: Copy IOS image from FTP server to flash if upgrade is needed
+      cisco.ios.ios_command:
+        commands:
+          - command: "copy ftp://{{ ftp_user }}:{{ ftp_pass }}@{{ ftp_server }}/{{ ios_image }} flash:"
+            prompt: "[Destination filename [.*]]?"
+            answer: "\r"
+      when: upgrade_needed
+      register: copy_result
+
+    - name: Execute show command to get file MD5 checksum
+      ios_command:
+        commands: "verify /md5 {{ ios_image_file }}"
+      register: md5_output
+
+    - name: Extract MD5 hash from command output
+      set_fact:
+        actual_md5: "{{ md5_output.stdout[0] | regex_search('([a-fA-F0-9]{32})') }}"
+
+    - name: Debug MD5 values
+      debug:
+        msg:
+          - "Expected MD5: {{ expected_md5 }}"
+          - "Actual MD5: {{ actual_md5 }}"
+
+    - name: Compare MD5 checksums
+      assert:
+        that:
+          - "actual_md5 | lower == expected_md5 | lower"
+        fail_msg: "MD5 checksum mismatch! Expected {{ expected_md5 }}, but got {{ actual_md5 }}"
+        success_msg: "MD5 checksum verified successfully!"
+
+    - name: Display result
+      debug:
+        msg: "IOS image MD5 verification completed."
+      when: actual_md5 is defined
+
+  
